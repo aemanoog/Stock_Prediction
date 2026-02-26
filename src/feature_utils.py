@@ -20,33 +20,37 @@ def extract_features():
     
     START_DATE = (datetime.date.today() - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
     END_DATE = datetime.date.today().strftime("%Y-%m-%d")
-    stk_tickers = ['MSFT', 'AMZN', 'AAPL']
-    ccy_tickers = ['DEXUSEU', 'DEXUSUK']
-    idx_tickers = ['SP500', 'NASDAQCOM', 'VIXCLS']
+    stk_tickers = ['MPWR','AAPL']
+    #ccy_tickers = ['DEXUSEU', 'DEXUSUK']
+    #idx_tickers = ['SP500', 'NASDAQCOM', 'VIXCLS']
     
     stk_data = yf.download(stk_tickers, start=START_DATE, end=END_DATE, auto_adjust=False)
     #stk_data = web.DataReader(stk_tickers, 'yahoo')
-    ccy_data = web.DataReader(ccy_tickers, 'fred', start=START_DATE, end=END_DATE)
-    idx_data = web.DataReader(idx_tickers, 'fred', start=START_DATE, end=END_DATE)
+    #ccy_data = web.DataReader(ccy_tickers, 'fred', start=START_DATE, end=END_DATE)
+    #idx_data = web.DataReader(idx_tickers, 'fred', start=START_DATE, end=END_DATE)
 
-    Y = np.log(stk_data.loc[:, ('Adj Close', 'MSFT')]).diff(return_period).shift(-return_period)
-    Y.name = Y.name[-1]+'_Future'
-    
-    X1 = np.log(stk_data.loc[:, ('Adj Close', ('AAPL', 'AMZN'))]).diff(return_period)
-    X1.columns = X1.columns.droplevel()
-    X2 = np.log(ccy_data).diff(return_period)
-    X3 = np.log(idx_data).diff(return_period)
+    #Y = np.log(stk_data.loc[:, ('Adj Close', 'MSFT')]).diff(return_period).shift(-return_period)
+    Y = stk_data.loc[:, ('Adj Close' , 'AAPL')]
+    Y.name = 'AAPL'
 
-    X = pd.concat([X1, X2, X3], axis=1)
+    X = stk_data.loc[:, ('Adj Close' , 'AAPL')]
+    X.name = 'MPWR'
     
-    dataset = pd.concat([Y, X], axis=1).dropna().iloc[::return_period, :]
+    #X1 = np.log(stk_data.loc[:, ('Adj Close', ('AAPL', 'AMZN'))]).diff(return_period)
+    #X1.columns = X1.columns.droplevel()
+    #X2 = np.log(ccy_data).diff(return_period)
+    #X3 = np.log(idx_data).diff(return_period)
+
+    #X = pd.concat([X1, X2, X3], axis=1)
+    
+    dataset = pd.concat([Y, X], axis=1).dropna()#.iloc[::return_period, :]
     Y = dataset.loc[:, Y.name]
     X = dataset.loc[:, X.columns]
     dataset.index.name = 'Date'
     #dataset.to_csv(r"./test_data.csv")
     features = dataset.sort_index()
     features = features.reset_index(drop=True)
-    features = features.iloc[:,1:]
+    #features = features.iloc[:,1:]
     return features
 
 
@@ -66,5 +70,6 @@ def get_bitcoin_historical_prices(days = 60):
     df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
     df = df[['Date', 'Close Price (USD)']].set_index('Date')
     return df
+
 
 
