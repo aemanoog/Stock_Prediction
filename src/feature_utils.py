@@ -45,7 +45,7 @@ def extract_features():
     
     dataset = pd.concat([Y, X], axis=1).dropna()#.iloc[::return_period, :]
     Y = dataset.loc[:, Y.name]
-    X = dataset.loc[:, X.columns]
+    X = dataset.loc[:, X.name]
     dataset.index.name = 'Date'
     #dataset.to_csv(r"./test_data.csv")
     features = dataset.sort_index()
@@ -70,6 +70,7 @@ def get_bitcoin_historical_prices(days = 60):
     df['Date'] = pd.to_datetime(df['Timestamp'], unit='ms').dt.normalize()
     df = df[['Date', 'Close Price (USD)']].set_index('Date')
     return df
+
 
 
 
