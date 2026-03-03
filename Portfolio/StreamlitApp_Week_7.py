@@ -111,13 +111,21 @@ def call_model_api(input_df):
 def display_explanation(input_df, session, aws_bucket):
     explainer_name = MODEL_INFO["explainer"]
     explainer = load_shap_explainer(session, aws_bucket, posixpath.join('explainer', explainer_name),os.path.join(tempfile.gettempdir(), explainer_name))
-    shap_values = explainer(input_df)
+
+    best_pipeline = load_pipeline(session, aws_bucket, 'sklearn-pipeline-deployment')
+    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-2])
+    input_df_transformed = preprocessing_pipeline.transform(input_df)
+    feature_names = best_pipeline[1:4].get_feature_names_out()
+    input_df_transformed = pd.DataFrame(input_df_transformed, columns=feature_names)
+    shap_values = explainer(input_df_transformed)
+   
     st.subheader("🔍 Decision Transparency (SHAP)")
     fig, ax = plt.subplots(figsize=(10, 4))
     shap.plots.waterfall(shap_values[0], max_display=10)
     st.pyplot(fig)
-    # top feature   
-    top_feature = shap_values[0].feature_names[0]
+    # top feature
+    top_feature = pd.Series(shap_values[0, :, 0].values, index=shap_values[0, :, 0].feature_names).abs().idmax()
+    #top_feature = shap_values[0].feature_names[0]
     st.info(f"**Business Insight:** The most influential factor in this decision was **{top_feature}**.")
 
 # Streamlit UI
@@ -133,7 +141,7 @@ with st.form("pred_form"):
         with cols[i % 2]:
             user_inputs[inp['name']] = st.number_input(
                 inp['name'].replace('_', ' ').upper(),
-                min_value=inp['min'], max_value=inp['max'], value=inp['default'], step=inp['step']
+                min_value=inp['min'], value=inp['default'], step=inp['step']
             )
     
     submitted = st.form_submit_button("Run Prediction")
@@ -151,6 +159,7 @@ if submitted:
         display_explanation(input_df,session, aws_bucket)
     else:
         st.error(res)
+
 
 
 
