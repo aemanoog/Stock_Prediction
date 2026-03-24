@@ -30,7 +30,7 @@ project_root = os.path.abspath(os.path.join(current_dir, '..'))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from src.feature_utils import extract_features
+from src.feature_utils import extract_features_pair
 
 # Access the secrets
 aws_id = st.secrets["aws_credentials"]["AWS_ACCESS_KEY_ID"]
@@ -53,7 +53,7 @@ session = get_session(aws_id, aws_secret, aws_token)
 sm_session = sagemaker.Session(boto_session=session)
 
 # Data & Model Configuration
-df_features = extract_features()
+df_features = extract_features_pair()
 
 MODEL_INFO = {
         "endpoint": aws_endpoint,
