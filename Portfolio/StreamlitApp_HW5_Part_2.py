@@ -99,7 +99,7 @@ def call_model_api(input_df):
     )
 
     try:
-        raw_pred = predictor.predict([[input_df[k] for k in MODEL_INFO["keys"]]])
+        raw_pred = predictor.predict(input_df)
         pred_val = pd.DataFrame(raw_pred).values[-1][0]
         mapping = {-1: "SELL", 0: "HOLD", 1: "BUY"}
         return mapping.get(pred_val), 200
