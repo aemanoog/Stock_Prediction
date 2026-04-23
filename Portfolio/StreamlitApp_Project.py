@@ -69,7 +69,7 @@ sm_session = sagemaker.Session(boto_session=session)
 MODEL_INFO = {
     "endpoint"  : aws_endpoint,
     "explainer" : "explainer_fraud.shap",
-    "pipeline"  : "fine_tuned_pipeline.tar.gz",
+    "pipeline"  : "finalized_fraud_model.tar.gz",
     "keys"      : ['TransactionAmt','addr1','addr2'],
     "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['TransactionAmt','addr1','addr2']]
 }
@@ -86,8 +86,8 @@ def load_pipeline(_session, bucket, key):
         # Extract the .joblib file from the .tar.gz
     with tarfile.open(filename, "r:gz") as tar:
         tar.extractall(path=".")
-        #joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
-        joblib_file = [f for f in tar.getnames() if f.endswith('.pkl')][0]
+        joblib_file = [f for f in tar.getnames() if f.endswith('.joblib')][0]
+        #joblib_file = [f for f in tar.getnames() if f.endswith('.pkl')][0]
     
 
     # Load the full pipeline
@@ -102,7 +102,7 @@ def load_shap_explainer(_session, bucket, key, local_path):
         s3_client.download_file(Filename=local_path, Bucket=bucket, Key=key)
         
     with open(local_path, "rb") as f:
-        return load(f)
+        return shap.Explainer.load(f)
         #return shap.Explainer.load(f)
 
 # Prediction Logic
@@ -112,17 +112,19 @@ def call_model_api(input_df):
         endpoint_name=MODEL_INFO["endpoint"],
         sagemaker_session=sm_session,
         serializer=JSONSerializer(), 
-        deserializer=NumpyDeserializer() 
+        deserializer=JSONDeserializer() 
     )
 
     try:
         raw_pred = predictor.predict(input_df)
-        pred_val = pd.DataFrame(raw_pred).values[-1][0]
-        #mapping = {0: "SELL", 1: "HOLD", 2: "BUY"}
+
+        pred_val = raw_pred["predictions"][0]
+        fraud_prob = raw_pred["probabilities"][0]
+
         mapping = {0: "Legitimate", 1: "Fraud"}
-        return mapping.get(pred_val), 200
-    except Exception as e:
-        return f"Error: {str(e)}", 500
+        label = mapping.get(pred_val, "Unknown")
+
+        return {"label": label, "probability": fraud_prob}, 200
 
 # Local Explainability
 def display_explanation(input_df, session, aws_bucket):
@@ -130,7 +132,7 @@ def display_explanation(input_df, session, aws_bucket):
     explainer = load_shap_explainer(session, aws_bucket, posixpath.join('explainer', explainer_name),os.path.join(tempfile.gettempdir(), explainer_name))
     
     best_pipeline = load_pipeline(session, aws_bucket, 'sklearn-pipeline-deployment')
-    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-3])
+    preprocessing_pipeline = Pipeline(steps=best_pipeline.steps[:-2])
     input_df=pd.DataFrame(input_df)
     input_df_transformed = preprocessing_pipeline.transform(input_df)
     feature_names = best_pipeline[:-2].get_feature_names_out()
@@ -169,7 +171,8 @@ if submitted:
 
     res, status = call_model_api(original)
     if status == 200:
-        st.metric("Prediction Result", res)
-        display_explanation(original,session, aws_bucket)
+        st.metric("Prediction Result", res["label"])
+        st.write(f"Fraud probability: {res['probability']:.4f}")
+        display_explanation(original, session, aws_bucket)
     else:
         st.error(res)
