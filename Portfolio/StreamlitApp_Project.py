@@ -111,8 +111,8 @@ def call_model_api(input_df):
     predictor = Predictor(
         endpoint_name=MODEL_INFO["endpoint"],
         sagemaker_session=sm_session,
-        serializer=JSONSerializer(), 
-        deserializer=JSONDeserializer() 
+        serializer=JSONSerializer(),
+        deserializer=JSONDeserializer()
     )
 
     try:
@@ -125,6 +125,10 @@ def call_model_api(input_df):
         label = mapping.get(pred_val, "Unknown")
 
         return {"label": label, "probability": fraud_prob}, 200
+
+    except Exception as e:
+        return f"Error calling endpoint: {str(e)}", 500
+        
 
 # Local Explainability
 def display_explanation(input_df, session, aws_bucket):
