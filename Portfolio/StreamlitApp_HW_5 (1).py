@@ -70,8 +70,8 @@ MODEL_INFO = {
     "endpoint"  : aws_endpoint,
     "explainer" : "explainer_project.shap",
     "pipeline"  : "fine_tuned_gbm_pipeline.tar.gz",
-    "keys"      : ['num_D2','num_C2','num_C1'],
-    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['TransactionAmt','addr1','addr2']]
+    "keys"      : ['remainder_remainder_C10','remainder_remainder_C7','remainder_log_amt_TransactionAmt'],
+    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['remainder_remainder_C10','remainder_remainder_C10','remainder_log_amt_TransactionAmt']]
 }
 
 
