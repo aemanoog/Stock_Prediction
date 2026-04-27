@@ -194,26 +194,27 @@ st.title("👨‍💻 ML Deployment")
 
 with st.form("pred_form"):
     st.subheader("Inputs")
+
     cols = st.columns(2)
     user_inputs = {}
 
-for i, inp in enumerate(MODEL_INFO["inputs"]):
-    with cols[i % 2]:
-        if inp["type"] == "text":
-            user_inputs[inp["name"]] = st.text_input(
-                inp["name"],
-                value=inp["default"],
-                key=f"input_{i}_{inp['name']}"
-            )
-        else:
-            user_inputs[inp["name"]] = st.number_input(
-                inp["name"],
-                min_value=inp["min"],
-                max_value=inp["max"],
-                value=inp["default"],
-                step=inp["step"],
-                key=f"input_{i}_{inp['name']}"
-            )
+    for i, inp in enumerate(MODEL_INFO["inputs"]):
+        with cols[i % 2]:
+            if inp["type"] == "text":
+                user_inputs[inp["name"]] = st.text_input(
+                    inp["name"],
+                    value=inp["default"],
+                    key=f"input_{i}_{inp['name']}"
+                )
+            else:
+                user_inputs[inp["name"]] = st.number_input(
+                    inp["name"],
+                    min_value=inp["min"],
+                    max_value=inp["max"],
+                    value=inp["default"],
+                    step=inp["step"],
+                    key=f"input_{i}_{inp['name']}"
+                )
 
     submitted = st.form_submit_button("Run Prediction")
 
