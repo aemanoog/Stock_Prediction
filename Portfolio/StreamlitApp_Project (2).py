@@ -67,11 +67,43 @@ sm_session = sagemaker.Session(boto_session=session)
 # Data & Model Configuration
 
 MODEL_INFO = {
-    "endpoint"  : aws_endpoint,
-    "explainer" : "explainer_project.shap",
-    "pipeline"  : "fine_tuned_gbm_pipeline.tar.gz",
-    "keys"      : ['remainder_remainder_C10','remainder_remainder_C7','remainder_log_amt_TransactionAmt'],
-    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['remainder_remainder_C10','remainder_remainder_C7','remainder_log_amt_TransactionAmt']]
+    "endpoint": aws_endpoint,
+    "explainer": "explainer_project.shap",
+    "pipeline": "fine_tuned_gbm_pipeline.tar.gz",
+    "keys": [
+        "TransactionID",
+        "TransactionDT",
+        "TransactionAmt",
+        "card1",
+        "card2",
+        "card3",
+        "card5",
+        "addr1",
+        "addr2",
+        "C1",
+        "C7",
+        "C10",
+        "D1",
+        "P_emaildomain",
+        "R_emaildomain"
+    ],
+    "inputs": [
+        {"name": "TransactionID", "type": "number", "min": 0.0, "max": 10000000.0, "default": 2987000.0, "step": 1.0},
+        {"name": "TransactionDT", "type": "number", "min": 0.0, "max": 10000000.0, "default": 86400.0, "step": 100.0},
+        {"name": "TransactionAmt", "type": "number", "min": 0.0, "max": 10000.0, "default": 100.0, "step": 1.0},
+        {"name": "card1", "type": "number", "min": 0.0, "max": 20000.0, "default": 13926.0, "step": 1.0},
+        {"name": "card2", "type": "number", "min": 0.0, "max": 1000.0, "default": 404.0, "step": 1.0},
+        {"name": "card3", "type": "number", "min": 0.0, "max": 300.0, "default": 150.0, "step": 1.0},
+        {"name": "card5", "type": "number", "min": 0.0, "max": 300.0, "default": 142.0, "step": 1.0},
+        {"name": "addr1", "type": "number", "min": 0.0, "max": 1000.0, "default": 315.0, "step": 1.0},
+        {"name": "addr2", "type": "number", "min": 0.0, "max": 100.0, "default": 87.0, "step": 1.0},
+        {"name": "C1", "type": "number", "min": 0.0, "max": 1000.0, "default": 1.0, "step": 1.0},
+        {"name": "C7", "type": "number", "min": 0.0, "max": 1000.0, "default": 0.0, "step": 1.0},
+        {"name": "C10", "type": "number", "min": 0.0, "max": 1000.0, "default": 0.0, "step": 1.0},
+        {"name": "D1", "type": "number", "min": 0.0, "max": 1000.0, "default": 14.0, "step": 1.0},
+        {"name": "P_emaildomain", "type": "text", "default": "gmail.com"},
+        {"name": "R_emaildomain", "type": "text", "default": "gmail.com"}
+    ]
 }
 
 
@@ -166,14 +198,21 @@ with st.form("pred_form"):
     user_inputs = {}
 
     for i, inp in enumerate(MODEL_INFO["inputs"]):
-        with cols[i % 2]:
+    with cols[i % 2]:
+        if inp["type"] == "text":
+            user_inputs[inp["name"]] = st.text_input(
+                inp["name"],
+                value=inp["default"],
+                key=f"input_{i}_{inp['name']}"
+            )
+        else:
             user_inputs[inp["name"]] = st.number_input(
-                inp["name"].replace("_", " ").upper(),
+                inp["name"],
                 min_value=inp["min"],
                 max_value=inp["max"],
                 value=inp["default"],
                 step=inp["step"],
-                key=f"input_{i}_{inp['name']}",
+                key=f"input_{i}_{inp['name']}"
             )
 
     submitted = st.form_submit_button("Run Prediction")
@@ -182,7 +221,7 @@ original = dataset.iloc[0:1].to_dict()
 original.update(user_inputs)
 if submitted:
 
-    res, status = call_model_api(original)
+    res, status = call_model_api([user_inputs])
     if status == 200:
         st.metric("Prediction Result", res)
         display_explanation(original,session, aws_bucket)
