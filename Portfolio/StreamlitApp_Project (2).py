@@ -197,7 +197,7 @@ with st.form("pred_form"):
     cols = st.columns(2)
     user_inputs = {}
 
-    for i, inp in enumerate(MODEL_INFO["inputs"]):
+for i, inp in enumerate(MODEL_INFO["inputs"]):
     with cols[i % 2]:
         if inp["type"] == "text":
             user_inputs[inp["name"]] = st.text_input(
