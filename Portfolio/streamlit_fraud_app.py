@@ -24,6 +24,7 @@ AWS_REGION = "us-east-1"
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tarfile
@@ -41,9 +42,7 @@ import sagemaker
 import shap
 import streamlit as st
 from imblearn.pipeline import Pipeline
-from sagemaker.deserializers import NumpyDeserializer
-from sagemaker.predictor import Predictor
-from sagemaker.serializers import JSONSerializer
+from botocore.exceptions import ClientError
 
 warnings.simplefilter("ignore")
 
@@ -266,28 +265,60 @@ def coerce_prediction(raw_pred: Any) -> Tuple[int, Optional[float], Any]:
     return pred_class, fraud_probability, raw_pred
 
 
-def call_sagemaker_endpoint(input_df: pd.DataFrame) -> Tuple[str, Optional[float], Any]:
+def make_json_payload(input_df: pd.DataFrame, mode: str) -> Any:
+    safe_df = input_df.copy().replace({np.nan: None})
+    if mode == "records":
+        return safe_df.to_dict(orient="records")
+    if mode == "split":
+        return safe_df.to_dict(orient="split")
+    if mode == "dataframe_dict":
+        return safe_df.to_dict(orient="dict")
+    if mode == "values":
+        return safe_df.values.tolist()
+    raise ValueError(f"Unknown payload mode: {mode}")
+
+
+def parse_sagemaker_response(body: bytes) -> Any:
+    text = body.decode("utf-8") if isinstance(body, (bytes, bytearray)) else str(body)
+    try:
+        return json.loads(text)
+    except Exception:
+        return text
+
+
+def invoke_endpoint_with_mode(input_df: pd.DataFrame, mode: str) -> Tuple[str, Optional[float], Any, Any]:
     aws_id, aws_secret, aws_token, _bucket, endpoint, region = get_aws_config()
     boto_session = get_boto_session(aws_id, aws_secret, aws_token, region)
-    sm_session = sagemaker.Session(boto_session=boto_session)
-
-    predictor = Predictor(
-        endpoint_name=endpoint,
-        sagemaker_session=sm_session,
-        serializer=JSONSerializer(),
-        deserializer=NumpyDeserializer(),
+    runtime = boto_session.client("sagemaker-runtime", region_name=region)
+    payload_obj = make_json_payload(input_df, mode)
+    response = runtime.invoke_endpoint(
+        EndpointName=endpoint,
+        ContentType="application/json",
+        Accept="application/json",
+        Body=json.dumps(payload_obj).encode("utf-8"),
     )
-
-    # IMPORTANT: send JSON in column-oriented DataFrame format.
-    # Your original Streamlit template called the endpoint with a DataFrame-like
-    # object. Sending a scalar record dict can cause pd.DataFrame(payload) inside
-    # the SageMaker inference script to fail and return a 500 error.
-    payload = input_df.to_dict()
-    raw_pred = predictor.predict(payload)
+    raw_pred = parse_sagemaker_response(response["Body"].read())
     pred_class, fraud_probability, _ = coerce_prediction(raw_pred)
     label = MODEL_INFO["class_labels"].get(pred_class, str(pred_class))
-    return label, fraud_probability, raw_pred
+    return label, fraud_probability, raw_pred, payload_obj
 
+
+def call_sagemaker_endpoint(input_df: pd.DataFrame, mode: str = "Auto try common formats") -> Tuple[str, Optional[float], Any, Any, str]:
+    modes = ["records", "split", "dataframe_dict", "values"] if mode == "Auto try common formats" else [mode]
+    errors: List[str] = []
+    for candidate_mode in modes:
+        try:
+            label, fraud_probability, raw_pred, payload_obj = invoke_endpoint_with_mode(input_df, candidate_mode)
+            return label, fraud_probability, raw_pred, payload_obj, candidate_mode
+        except ClientError as exc:
+            errors.append(f"{candidate_mode}: {str(exc)[:700]}")
+            if mode != "Auto try common formats":
+                raise
+        except Exception as exc:
+            errors.append(f"{candidate_mode}: {type(exc).__name__}: {str(exc)[:700]}")
+            if mode != "Auto try common formats":
+                raise
+    raise RuntimeError("SageMaker rejected every common JSON payload format. Server-side inference_project.py is still erroring.\n\n" + "\n\n".join(errors))
 
 def build_input_row(reference_df: pd.DataFrame, row_index: int, edited_values: Dict[str, Any]) -> pd.DataFrame:
     """Create a full one-row model input using a reference row plus user edits."""
@@ -409,6 +440,11 @@ with st.sidebar:
     show_raw_payload = st.checkbox("Show model input payload", value=False)
     show_raw_response = st.checkbox("Show raw endpoint response", value=False)
     enable_shap = st.checkbox("Show SHAP explanation", value=True)
+    payload_mode = st.selectbox(
+        "SageMaker payload format",
+        options=["Auto try common formats", "records", "split", "dataframe_dict", "values"],
+        index=0,
+    )
 
 reference_df = load_reference_data()
 
@@ -476,7 +512,7 @@ if show_raw_payload:
 if submitted:
     try:
         with st.spinner("Calling SageMaker endpoint..."):
-            label, fraud_probability, raw_response = call_sagemaker_endpoint(input_df)
+            label, fraud_probability, raw_response, actual_payload, actual_mode = call_sagemaker_endpoint(input_df, payload_mode)
 
         result_col, prob_col = st.columns(2)
         with result_col:
@@ -487,12 +523,16 @@ if submitted:
             else:
                 st.metric("Estimated Fraud Probability", "Not returned")
 
+        st.caption(f"SageMaker payload format used: `{actual_mode}`")
+
         if label.lower() == "fraud":
             st.error("This transaction was classified as potentially fraudulent.")
         else:
             st.success("This transaction was classified as legitimate.")
 
         if show_raw_response:
+            st.subheader("Actual SageMaker Payload")
+            st.json(actual_payload)
             st.subheader("Raw Endpoint Response")
             st.write(raw_response)
 
@@ -510,6 +550,6 @@ with st.expander("Deployment checklist"):
         - Keep `src/Custom_Classes.py` and `src/feature_utils.py` in the repo so the saved pipeline can unpickle.
         - Keep `Portfolio/X_train.csv` in the repo if you want full-row sample defaults.
         - Add AWS keys, bucket, endpoint, and region to `.streamlit/secrets.toml`.
-        - Confirm the SageMaker endpoint is running before using the app.
+        - Confirm the SageMaker endpoint is running before using the app.\n        - If Auto mode still fails, open the CloudWatch log link in the error and check the server-side traceback inside `inference_project.py`.
         """
     )
