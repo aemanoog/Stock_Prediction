@@ -71,7 +71,7 @@ MODEL_INFO = {
     "explainer" : "explainer_project.shap",
     "pipeline"  : "fine_tuned_gbm_pipeline.tar.gz",
     "keys"      : ['remainder_remainder_C10','remainder_remainder_C7','remainder_log_amt_TransactionAmt'],
-    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['remainder_remainder_C10','remainder_remainder_C10','remainder_log_amt_TransactionAmt']]
+    "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['remainder_remainder_C10','remainder_remainder_C7','remainder_log_amt_TransactionAmt']]
 }
 
 
@@ -161,17 +161,21 @@ st.set_page_config(page_title="ML Deployment", layout="wide")
 st.title("👨‍💻 ML Deployment")
 
 with st.form("pred_form"):
-    st.subheader(f"Inputs")
+    st.subheader("Inputs")
     cols = st.columns(2)
     user_inputs = {}
-    
+
     for i, inp in enumerate(MODEL_INFO["inputs"]):
         with cols[i % 2]:
-            user_inputs[inp['name']] = st.number_input(
-                inp['name'].replace('_', ' ').upper(),
-                min_value=inp['min'], max_value=inp['max'], value=inp['default'], step=inp['step']
+            user_inputs[inp["name"]] = st.number_input(
+                inp["name"].replace("_", " ").upper(),
+                min_value=inp["min"],
+                max_value=inp["max"],
+                value=inp["default"],
+                step=inp["step"],
+                key=f"input_{i}_{inp['name']}",
             )
-    
+
     submitted = st.form_submit_button("Run Prediction")
 
 original = dataset.iloc[0:1].to_dict()
