@@ -278,7 +278,11 @@ def call_sagemaker_endpoint(input_df: pd.DataFrame) -> Tuple[str, Optional[float
         deserializer=NumpyDeserializer(),
     )
 
-    payload = input_df.to_dict(orient="records")[0]
+    # IMPORTANT: send JSON in column-oriented DataFrame format.
+    # Your original Streamlit template called the endpoint with a DataFrame-like
+    # object. Sending a scalar record dict can cause pd.DataFrame(payload) inside
+    # the SageMaker inference script to fail and return a 500 error.
+    payload = input_df.to_dict()
     raw_pred = predictor.predict(payload)
     pred_class, fraud_probability, _ = coerce_prediction(raw_pred)
     label = MODEL_INFO["class_labels"].get(pred_class, str(pred_class))
