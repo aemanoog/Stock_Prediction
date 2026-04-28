@@ -69,8 +69,8 @@ sm_session = sagemaker.Session(boto_session=session)
 
 MODEL_INFO = {
     "endpoint"  : aws_endpoint,
-    "explainer" : "explainer_sentiment.shap",
-    "pipeline"  : "finalized_fraud_model.tar.gz",
+    "explainer" : "explainer_project.shap",
+    "pipeline"  : "fine_tuned_gbm_pipeline.tar.gz",
     "keys"      : ['TransactionAmt','card1','card2','C1'],
     "inputs"    : [{"name": k, "type": "number", "min": -1.0, "max": 1.0, "default": 0.0, "step": 0.01} for k in ['TransactionAmt','card1','card2','C1']]
 }
@@ -135,12 +135,12 @@ def display_explanation(input_df, session, aws_bucket):
     input_df=pd.DataFrame(input_df)
     input_df_transformed = preprocessing_pipeline.transform(input_df)
     #feature_names = best_pipeline[:-3].get_feature_names_out()
-    dataset_1 = dataset.iloc[:, 0:]
-    feature_names = dataset_1.columns[1:]
-    selector = best_pipeline.named_steps['selector']
-    selected_features = feature_names[selector.get_support()]
-    input_df_transformed = pd.DataFrame(input_df_transformed, columns=selected_features)
-    #input_df_transformed = pd.DataFrame(input_df_transformed)
+    #dataset_1 = dataset.iloc[:, 0:]
+    #feature_names = dataset_1.columns[1:]
+    #selector = best_pipeline.named_steps['selector']
+    #selected_features = feature_names[selector.get_support()]
+    #input_df_transformed = pd.DataFrame(input_df_transformed, columns=selected_features)
+    input_df_transformed = pd.DataFrame(input_df_transformed)
     shap_values = explainer(input_df_transformed)
    
     st.subheader("🔍 Decision Transparency (SHAP)")
