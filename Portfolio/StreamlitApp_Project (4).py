@@ -145,7 +145,7 @@ def display_explanation(input_df, session, aws_bucket):
    
     st.subheader("🔍 Decision Transparency (SHAP)")
     fig, ax = plt.subplots(figsize=(10, 4))
-    shap.plots.waterfall(shap_values[0, :, 1])  # class 1 = fraud
+    shap.plots.waterfall(shap_values[0])  # class 1 = fraud
     st.pyplot(fig)
     top_feature = pd.Series(shap_values[0, :, 1].values, index=shap_values[0, :, 1].feature_names).abs().idxmax()
     st.info(f"**Business Insight:** The most influential factor in this decision was **{top_feature}**.")
